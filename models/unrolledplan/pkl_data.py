@@ -35,7 +35,7 @@ def main():
             img = pickle.load(open(_img_file, 'rb'))
             #plt.close()
             #img = plt.imread(_img_file)
-            _img_data.append(np.array(img))
+            _img_data.append(np.array(img)[:, :, :3])
 
         if len(_txt_data) != len(_img_data):
             _txt_data = _txt_data[1:]
