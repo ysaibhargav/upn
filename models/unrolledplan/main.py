@@ -124,7 +124,7 @@ def main():
     act_scale_coeff = args.act_scale_coeff
 
     t0 = time.time()
-    actions, imgs, lens = pickle.load(open(args.pkl_path, 'rb'))
+    actions, qt, imgs, lens = pickle.load(open(args.pkl_path, 'rb'))
     t1 = time.time()
     args.act_dim = actions[0][0].shape[-1]
     print('Loaded data from pkl, took %fs'%(t1-t0))
@@ -135,11 +135,15 @@ def main():
     train_actions = actions[:args.num_train]
     test_actions = actions[-args.num_test:]
     del actions
+
+    train_qt = qt[:args.num_train]
+    test_qt = qt[-args.num_test:]
+    del qt
     del lens
 
     t0 = time.time()
-    train_actions, train_imgs = slice_rollouts(train_actions, train_imgs, slice_len=args.slice_len)
-    test_actions, test_imgs = slice_rollouts(test_actions, test_imgs, slice_len=args.slice_len)
+    train_actions, train_qt, train_imgs = slice_rollouts(train_actions, train_qt, train_imgs, slice_len=args.slice_len)
+    test_actions, test_qt, test_imgs = slice_rollouts(test_actions, test_qt, test_imgs, slice_len=args.slice_len)
     t1 = time.time()
     print('Sliced rollouts, took %fs'%(t1-t0))
 
@@ -175,6 +179,7 @@ def main():
         t0 = time.time()
         batch_ot, batch_og, batch_atT_target, batch_mask, batch_atT_original, batch_eff_horizons  =  batch_sample(train_imgs,
                                                                                                                   train_actions,
+                                                                                                                  train_qt,
                                                                                                                   total_num=args.num_train,
                                                                                                                   img_h=args.img_h,
                                                                                                                   img_w=args.img_w,
