@@ -125,7 +125,7 @@ def slice_rollouts(actions, positions, imgs, slice_len=25):
 def main():
 
     args = parse_args()
-    dirname = args.task + '_latent_planning_ol_lr' + str(args.ol_lr) + '_il_lr' + str(args.il_lr) + '_num_plan_updates_' + str(args.num_plan_updates) + '_inner_horizon_' + str(args.inner_horizon) + '_outer_horizon' + str(args.outer_horizon) + '_num_train_' + str(args.num_train) + (args.bias_transform ? '_bias_transform' : '') + (args.spatial_softmax ? '_spatial_softmax' : '')  '_' + time.strftime("%d-%m-%Y_%H-%M-%S")
+    dirname = args.task + '_latent_planning_ol_lr' + str(args.ol_lr) + '_il_lr' + str(args.il_lr) + '_num_plan_updates_' + str(args.num_plan_updates) + '_inner_horizon_' + str(args.inner_horizon) + '_outer_horizon' + str(args.outer_horizon) + '_num_train_' + str(args.num_train) + ('_bias_transform' if args.bias_transform else '') + ('_spatial_softmax' if args.spatial_softmax else '') + '_' + time.strftime("%d-%m-%Y_%H-%M-%S")
     if not os.path.isdir(os.path.join(args.save_directory, dirname)):
         os.makedirs(os.path.join(args.save_directory, dirname))
     sess = tf.Session()
