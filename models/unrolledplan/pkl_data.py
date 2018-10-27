@@ -5,7 +5,7 @@ import os
 import argparse
 
 """
-~/anaconda3/bin/python pkl_data.py --path-prefix "../../../../Data/processed/caps-small2/pushfront_cubeenv1*" --save-dir pkl
+~/anaconda3/bin/python pkl_data.py --path-prefix "../../../../Data/processed/caps-small3/pushfront_cubeenv1*" --save-dir pkl2
 """
 
 

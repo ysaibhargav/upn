@@ -45,7 +45,7 @@ class IMP(object):
         self.atT_original = tf.placeholder(tf.float32, [None, inner_horizon, act_dim], name='atT_0')
         self.og = tf.placeholder(tf.float32, [None, img_w, img_h, img_c], name = 'og')
         self.atT_target = tf.placeholder(tf.float32, [None, inner_horizon, act_dim], name='atT_target')
-        #self.qt = tf.placeholder(tf.float32, [None, joint_dim], name='qt')
+        self.qt = tf.placeholder(tf.float32, [None, act_dim], name='qt')
         self.plan_loss_mask = tf.placeholder(tf.float32, [None, inner_horizon], name='mask')
         self.eff_horizons = tf.placeholder(tf.int32, [None], name='eff_horizons')
 
@@ -88,7 +88,7 @@ class IMP(object):
                                      #nonlinearity='swish',
                                      reuse=True)
 
-                 #xt = tf.concat([xt, self.qt], axis=1)
+                xt = tf.concat([xt, self.qt], axis=1)
 
                 if bias_transform:
                             bias_transform = tf.get_variable('bias_transform',
@@ -371,6 +371,7 @@ class IMP(object):
                 eff_horizons,
                 atT_original,
                 atT_target,
+                pos,
                 plan_loss_mask,
                 il_lr_0,
                 il_lr,
@@ -383,6 +384,7 @@ class IMP(object):
                                 self.eff_horizons:eff_horizons,
                                 self.atT_original:atT_original,
                                 self.atT_target:atT_target,
+                                self.qt:pos,
                                 self.plan_loss_mask:plan_loss_mask,
                                 self.il_lr_0:il_lr_0,
                                 self.il_lr:il_lr,
@@ -394,6 +396,7 @@ class IMP(object):
                 eff_horizons,
                 atT_original,
                 atT_target,
+                qt,
                 plan_loss_mask,
                 il_lr_0,
                 il_lr,
@@ -405,6 +408,7 @@ class IMP(object):
                                                                                     self.eff_horizons:eff_horizons,
                                                                                     self.atT_original:atT_original,
                                                                                     self.atT_target:atT_target,
+                                                                                    self.qt:qt,
                                                                                     self.plan_loss_mask:plan_loss_mask,
                                                                                     self.il_lr_0:il_lr_0,
                                                                                     self.il_lr:il_lr})

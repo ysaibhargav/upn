@@ -28,8 +28,8 @@ def parse_args():
     parser.add_argument('--testing-frequency', type=int, default=2000, help='how frequently to get stats for test data')
     parser.add_argument('--print-frequency', type=int, default=100, help='print message frequency')
     parser.add_argument('--log-file', type=str, default='log', help='name of log file to dump test data stats')
-    parser.add_argument('--log-directory', type=str, default='log', help='name of log directory to dump checkpoints')
-    parser.add_argument('--pkl-path', type=str, default='pkl/pushfront_cubeenv1.p', help='path to pickle file')
+    parser.add_argument('--save-directory', type=str, default='out-qt', help='name of log directory to dump checkpoints')
+    parser.add_argument('--pkl-path', type=str, default='pkl/pushfront_cubeenv1_qt.p', help='path to pickle file')
     parser.add_argument('--huber', dest='huber_loss', action='store_true', help='whether to use Huber Loss')
     parser.add_argument('--no-huber', dest='huber_loss', action='store_false', help='whether not to use Huber Loss')
     parser.set_defaults(huber_loss=True)
@@ -50,6 +50,7 @@ def parse_args():
 
 def batch_sample(imgs,
                  actions,
+                 positions,
                  total_num=1000,
                  img_h=84,
                  img_w=84,
@@ -65,16 +66,19 @@ def batch_sample(imgs,
     rollout_idxs = np.random.choice([i for i in range(len(imgs))], size=batch_size, replace=False)
     batch_rollout_imgs = list(np.take(imgs, rollout_idxs))
     batch_rollout_actions = list(np.take(actions, rollout_idxs))
+    batch_rollout_positions = list(np.take(positions, rollout_idxs))
 
     batch_ot = np.zeros((batch_size, img_h, img_w, 3))
     batch_og = np.zeros((batch_size, img_h, img_w, 3))
     batch_atT = np.zeros((batch_size, max_horizon, act_dim))
+    batch_pos = np.zeros((batch_size, act_dim))
     batch_mask = np.ones((batch_size, max_horizon))
     batch_eff_horizons = np.ones(batch_size, dtype='int32')
 
     for batch_idx in range(batch_size):
         rollout_imgs = batch_rollout_imgs[batch_idx]
         rollout_actions = batch_rollout_actions[batch_idx]
+        rollout_positions = batch_rollout_positions[batch_idx]
         sampling_max_horizon = len(rollout_imgs)
         t1, t2 = 0, 0
         trials = 0
@@ -91,34 +95,39 @@ def batch_sample(imgs,
         batch_ot[batch_idx, :, :, :] = rollout_imgs[t1]
         batch_og[batch_idx, :, :, :] = rollout_imgs[t2]
         batch_atT[batch_idx, :effective_horizon, :] = (1./act_scale_coeff)*np.array(rollout_actions[t1:t2])
+        batch_pos[batch_idx, :] = (1./act_scale_coeff)*np.array(rollout_positions[t1])
         batch_eff_horizons[batch_idx] = effective_horizon - 1
         if effective_horizon < max_horizon:
             batch_mask[batch_idx, effective_horizon:] = 0
         batch_atT_original = np.random.uniform(-1., 1., size=(batch_size, max_horizon, act_dim))
-    return batch_ot, batch_og, batch_atT, batch_mask, batch_atT_original, batch_eff_horizons
+    return batch_ot, batch_og, batch_atT, batch_pos, batch_mask, batch_atT_original, batch_eff_horizons
 
-def slice_rollouts(actions, imgs, slice_len=25):
+def slice_rollouts(actions, positions, imgs, slice_len=25):
     sliced_actions = []
+    sliced_positions = []
     sliced_imgs = []
 
-    for _actions, _imgs in zip(actions, imgs):
+    for _actions, _positions, _imgs in zip(actions, positions, imgs):
         assert len(_actions) == len(_imgs)
+        assert len(_actions) == len(_positions)
         rollout_len = len(_actions)
         num_slices = (rollout_len+slice_len-1)/slice_len
         sliced_actions.extend([_actions[i*slice_len:min((i+1)*slice_len, rollout_len)] for i in range(num_slices)])
+        sliced_positions.extend([_positions[i*slice_len:min((i+1)*slice_len, rollout_len)] for i in range(num_slices)])
         sliced_imgs.extend([_imgs[i*slice_len:min((i+1)*slice_len, rollout_len)] for i in range(num_slices)])
 
     sliced_actions = [_sliced_actions for _sliced_actions in sliced_actions if len(_sliced_actions) > 1]
+    sliced_positions = [_sliced_positions for _sliced_positions in sliced_positions if len(_sliced_positions) > 1]
     sliced_imgs = [_sliced_imgs for _sliced_imgs in sliced_imgs if len(_sliced_imgs) > 1]
 
-    return sliced_actions, sliced_imgs
+    return sliced_actions, sliced_positions, sliced_imgs
 
 def main():
 
     args = parse_args()
     dirname = args.task + '_latent_planning_ol_lr' + str(args.ol_lr) + '_num_plan_updates_' + str(args.num_plan_updates) + '_horizon_' + str(args.inner_horizon) + '_num_train_' + str(args.num_train) + '_' + time.strftime("%d-%m-%Y_%H-%M-%S")
-    if not os.path.isdir('out/' + dirname):
-        os.makedirs('out/' + dirname)
+    if not os.path.isdir(os.path.join(args.save_directory, dirname)):
+        os.makedirs(os.path.join(args.save_directory, dirname))
     sess = tf.Session()
 
     act_scale_coeff = args.act_scale_coeff
@@ -177,7 +186,7 @@ def main():
             print('Batch update %d/%d, time %f'%(batch_idx, args.num_batch_updates, train_t1-train_t0))
 
         t0 = time.time()
-        batch_ot, batch_og, batch_atT_target, batch_mask, batch_atT_original, batch_eff_horizons  =  batch_sample(train_imgs,
+        batch_ot, batch_og, batch_atT_target, batch_pos, batch_mask, batch_atT_original, batch_eff_horizons  =  batch_sample(train_imgs,
                                                                                                                   train_actions,
                                                                                                                   train_qt,
                                                                                                                   total_num=args.num_train,
@@ -197,6 +206,7 @@ def main():
                           batch_eff_horizons,
                           batch_atT_original,
                           batch_atT_target,
+                          batch_pos,
                           batch_mask,
                           args.il_lr_0,
                           args.il_lr,
@@ -212,13 +222,15 @@ def main():
                                                                                                                       batch_eff_horizons,
                                                                                                                       batch_atT_original,
                                                                                                                       batch_atT_target,
+                                                                                                                      batch_pos,
                                                                                                                       batch_mask,
                                                                                                                       args.il_lr_0,
                                                                                                                       args.il_lr,
                                                                                                                       sess)
 
-            batch_ot, batch_og, batch_atT_target, batch_mask, batch_atT_original, batch_eff_horizons = batch_sample(test_imgs,
+            batch_ot, batch_og, batch_atT_target, batch_pos, batch_mask, batch_atT_original, batch_eff_horizons = batch_sample(test_imgs,
                                                                                                                     test_actions,
+                                                                                                                    test_qt,
                                                                                                                     total_num=args.num_test,
                                                                                                                     img_h=args.img_h,
                                                                                                                     img_w=args.img_w,
@@ -233,6 +245,7 @@ def main():
                                                                                                 batch_eff_horizons,
                                                                                                 batch_atT_original,
                                                                                                 batch_atT_target,
+                                                                                                batch_pos,
                                                                                                 batch_mask,
                                                                                                 args.il_lr_0,
                                                                                                 args.il_lr,
@@ -251,7 +264,7 @@ def main():
                                train_loss=bc_loss_train,
                                train_loss_first_step=bc_loss_first_step_train,
                                planning_loss=plan_loss)
-            pickle.dump(object_dump, open('out/' + dirname + '/weight_dump_' + str(batch_idx) + '.pkl', 'wb'))
+            pickle.dump(object_dump, open(args.save_directory + '/' + dirname + '/weight_dump_' + str(batch_idx) + '.pkl', 'wb'))
             del weight_dump, object_dump
 
 if __name__ == '__main__':
