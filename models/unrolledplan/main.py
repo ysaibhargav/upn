@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument('--print-frequency', type=int, default=100, help='print message frequency')
     parser.add_argument('--log-file', type=str, default='log', help='name of log file to dump test data stats')
     parser.add_argument('--save-directory', type=str, default='out-qt', help='name of log directory to dump checkpoints')
+    parser.add_argument('--weights-path', type=str, default='', help='path to weight dump')
     parser.add_argument('--pkl-path', type=str, default='pkl/pushfront_cubeenv1_qt.p', help='path to pickle file')
     parser.add_argument('--huber', dest='huber_loss', action='store_true', help='whether to use Huber Loss')
     parser.add_argument('--no-huber', dest='huber_loss', action='store_false', help='whether not to use Huber Loss')
@@ -177,7 +178,19 @@ def main():
     t1 = time.time()
     print('Constructed network, took %fs'%(t1-t0))
 
+    should_train = args.weights_path == ''
+
     sess.run(tf.global_variables_initializer())
+
+    if not should_train:
+        object_dump = pickle.load(open(args.weights_path, 'rb'))
+        weights_dump = object_dump['weights']
+        del object_dump
+
+        for var in imp_network.trainable_vars:
+            var.load(weights_dump[var.name], session=sess)
+
+        return
 
     train_t0 = time.time()
     for batch_idx  in range(args.num_batch_updates):

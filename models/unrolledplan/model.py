@@ -414,6 +414,31 @@ class IMP(object):
                                                                                     self.il_lr:il_lr})
 
         return np.sqrt(bc_loss), np.sqrt(plan_loss), xg_pred, xg, np.sqrt(bc_loss_first_step)
+
+    def infer(self,
+                ot,
+                og,
+                eff_horizons,
+                atT_original,
+                atT_target,
+                qt,
+                plan_loss_mask,
+                il_lr_0,
+                il_lr,
+                sess):
+
+        atT = sess.run([self.atT],
+                                                                        feed_dict={ self.ot:ot,
+                                                                                    self.og:og,
+                                                                                    self.eff_horizons:eff_horizons,
+                                                                                    self.atT_original:atT_original,
+                                                                                    self.qt:qt,
+                                                                                    self.plan_loss_mask:plan_loss_mask,
+                                                                                    self.il_lr_0:il_lr_0,
+                                                                                    self.il_lr:il_lr})
+
+        return atT
+
     def plan(self,
                 ot,
                 og,
